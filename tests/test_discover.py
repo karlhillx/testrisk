@@ -5,9 +5,12 @@ from pathlib import Path
 import pytest
 
 from testrisk.discover import (
+    DEFAULT_OMIT,
     find_coverage_file,
     find_repo_root,
     matches_filter,
+    matches_glob,
+    omitted,
     path_key,
     relativize,
     resolve_repo_path,
@@ -45,8 +48,9 @@ def test_find_coverage_prefers_json(tmp_path):
 
 
 def test_find_coverage_missing_explains_how(tmp_path):
-    with pytest.raises(GapError, match="pytest --cov"):
+    with pytest.raises(GapError, match="pytest --cov") as exc:
         find_coverage_file(tmp_path)
+    assert "testrisk --changed" in str(exc.value)
 
 
 def test_find_coverage_explicit_missing(tmp_path):
@@ -75,3 +79,15 @@ def test_same_relpath_tolerates_prefix_mismatch():
 def test_path_key_uses_posix_slashes():
     key = path_key(Path("demo") / "services.py")
     assert key.replace("\\", "/").endswith("demo/services.py")
+
+
+def test_matches_glob_and_omit():
+    path = Path("demo/migrations/0001_init.py")
+    assert matches_glob(path, "**/migrations/**")
+    assert matches_glob(Path("src/foo/bar.py"), "src/foo/**")
+    assert matches_glob(Path("demo/services.py"), "services.py")
+    assert omitted(path, ("**/migrations/**",))
+    assert not omitted(Path("demo/services.py"), ("**/migrations/**",))
+    assert omitted(Path("pkg/__init__.py"), DEFAULT_OMIT)
+    assert omitted(Path("demo/migrations/0001.py"), DEFAULT_OMIT)
+    assert not omitted(Path("demo/services.py"), DEFAULT_OMIT)

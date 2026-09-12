@@ -102,15 +102,24 @@ class Ui:
         label = self._paint(f"{key:<12}", DIM)
         self._write(f"  {label}{value}", persist=persist)
 
+    def row(self, key: str, value: str, *, persist: bool = False, indent: str = "     ") -> None:
+        label = self._paint(f"{key:<10}", DIM)
+        self._write(f"{indent}{label}{value}", persist=persist)
+
     def blank(self, *, persist: bool = False) -> None:
         self._write("", persist=persist)
 
+    def rule(self, *, persist: bool = False, width: int = 58) -> None:
+        char = "─" if self.unicode else "-"
+        self.note(f"  {char * width}", persist=persist)
+
     def risk(self, label: str) -> str:
-        if label == "HIGH":
-            return self._paint(label, RED, BOLD)
-        if label == "MEDIUM":
-            return self._paint(label, YELLOW, BOLD)
-        return self._paint(label, DIM)
+        key = label.strip()
+        if key == "HIGH":
+            return self._paint(key, RED, BOLD)
+        if key == "MEDIUM":
+            return self._paint(key, YELLOW, BOLD)
+        return self._paint(key, DIM)
 
 
 _ui: Ui | None = None

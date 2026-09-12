@@ -35,7 +35,11 @@ jobs:
       run: uv run python -m testrisk --version
 
     - name: Run tests
-      run: uv run pytest --cov=testrisk --cov-report=xml tests/
+      run: uv run pytest --cov=testrisk --cov-report=xml --cov-report=json tests/
+
+    - name: Rank test gaps
+      if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12'
+      run: uv run testrisk --top 10
 
     - name: Upload coverage
       if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12'

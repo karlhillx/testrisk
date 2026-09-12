@@ -17,6 +17,18 @@ _DEFAULT_BASES = (
     "master",
 )
 
+
+def ci_base_candidates() -> tuple[str, ...]:
+    """GitHub Actions PR target, if the runner exported ``GITHUB_BASE_REF``."""
+    ref = os.environ.get("GITHUB_BASE_REF", "").strip()
+    if not ref:
+        return ()
+    ref = ref.removeprefix("refs/heads/")
+    if not ref:
+        return ()
+    return (f"origin/{ref}", ref)
+
+
 # Isolate from the caller's GIT_DIR / worktree so ``--repo`` is honored.
 _GIT_ENV_DROP = ("GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_OBJECT_DIRECTORY")
 
@@ -64,7 +76,7 @@ def resolve_base(root: Path, explicit: str | None) -> str | None:
         return None
     if explicit:
         return explicit if _ref_exists(root, explicit) else None
-    for candidate in _DEFAULT_BASES:
+    for candidate in (*ci_base_candidates(), *_DEFAULT_BASES):
         if _ref_exists(root, candidate):
             return candidate
     return "HEAD"
@@ -85,6 +97,26 @@ def changed_lines(root: Path, base: str | None) -> dict[Path, frozenset[int]]:
     if result is None or result.returncode != 0:
         return {}
     return parse_diff(result.stdout)
+
+
+def dirty_python_files(root: Path) -> tuple[Path, ...]:
+    """Modified, staged, or untracked ``.py`` files in the working tree."""
+    if not is_git_repo(root):
+        return ()
+    names: set[Path] = set()
+    queries = (
+        ["ls-files", "-m", "-o", "--exclude-standard", "--", "*.py"],
+        ["diff", "--name-only", "--cached", "--", "*.py"],
+    )
+    for args in queries:
+        result = _run_git(root, args, timeout=5)
+        if result is None or result.returncode != 0:
+            continue
+        for line in result.stdout.splitlines():
+            text = line.strip().replace("\\", "/")
+            if text.endswith(".py"):
+                names.add(Path(text))
+    return tuple(sorted(names, key=lambda path: path.as_posix()))
 
 
 def _diff_spec(root: Path, base: str) -> str | None:

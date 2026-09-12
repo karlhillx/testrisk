@@ -13,6 +13,75 @@ class Risk(StrEnum):
     LOW = "LOW"
 
 
+class TestKind(StrEnum):
+    """How related tests stand relative to a gap. Not a pytest test class."""
+
+    __test__ = False
+    NONE = "none"
+    INDIRECT = "indirect"
+    WEAK = "weak"
+    MEANINGFUL = "meaningful"
+
+
+_RISK_RANK = {Risk.LOW: 0, Risk.MEDIUM: 1, Risk.HIGH: 2}
+
+
+def parse_risk(value: str | Risk) -> Risk:
+    """Parse a risk label; raises ``ValueError`` if unknown."""
+    if isinstance(value, Risk):
+        return value
+    key = value.strip().upper()
+    try:
+        return Risk(key)
+    except ValueError:
+        raise ValueError(f"Unknown risk {value!r}; use LOW, MEDIUM, or HIGH") from None
+
+
+def risk_rank(risk: Risk) -> int:
+    return _RISK_RANK[risk]
+
+
+def risk_at_least(risk: Risk, floor: Risk) -> bool:
+    return _RISK_RANK[risk] >= _RISK_RANK[floor]
+
+
+def worst_risk(risks: tuple[Risk, ...] | list[Risk]) -> Risk | None:
+    if not risks:
+        return None
+    return max(risks, key=risk_rank)
+
+
+@dataclass(frozen=True)
+class ScoreParts:
+    """How a gap score was assembled. Defaults match :func:`testrisk.rank.score_gap`."""
+
+    missing_lines: float = 0.0
+    missing_branches: float = 0.0
+    complexity: float = 0.0
+    changed_uncovered: float = 0.0
+    no_tests: float = 0.0
+
+    @property
+    def total(self) -> float:
+        return (
+            self.missing_lines
+            + self.missing_branches
+            + self.complexity
+            + self.changed_uncovered
+            + self.no_tests
+        )
+
+    def to_dict(self) -> dict[str, float]:
+        return {
+            "missing_lines": round(self.missing_lines, 3),
+            "missing_branches": round(self.missing_branches, 3),
+            "complexity": round(self.complexity, 3),
+            "changed_uncovered": round(self.changed_uncovered, 3),
+            "no_tests": round(self.no_tests, 3),
+            "total": round(self.total, 3),
+        }
+
+
 @dataclass(frozen=True)
 class BranchGap:
     """One uncovered branch, as coverage.py records it."""
@@ -87,10 +156,31 @@ class Gap:
     suggested_test: Path
     score: float
     risk: Risk
+    score_parts: ScoreParts = field(default_factory=ScoreParts)
+    weak_tests: tuple[Path, ...] = ()
+    weak_reasons: tuple[str, ...] = ()
+    test_kind: TestKind | None = None
 
     @property
     def qualname(self) -> str:
         return f"{self.path.as_posix()}::{self.name}"
+
+    @property
+    def kind(self) -> TestKind:
+        if self.test_kind is not None:
+            return self.test_kind
+        if self.has_meaningful_tests:
+            return TestKind.MEANINGFUL
+        if self.weak_tests:
+            return TestKind.WEAK
+        return TestKind.NONE
+
+    @property
+    def has_meaningful_tests(self) -> bool:
+        if not self.has_tests or not self.existing_tests:
+            return False
+        weak = set(self.weak_tests)
+        return any(path not in weak for path in self.existing_tests)
 
     def to_dict(self) -> dict[str, object]:
         return {
@@ -106,11 +196,59 @@ class Gap:
             "complexity": self.complexity,
             "changed_uncovered": list(self.changed_uncovered),
             "has_tests": self.has_tests,
+            "has_meaningful_tests": self.has_meaningful_tests,
+            "test_kind": self.kind.value,
             "existing_tests": [path.as_posix() for path in self.existing_tests],
+            "weak_tests": [path.as_posix() for path in self.weak_tests],
+            "weak_reasons": list(self.weak_reasons),
             "suggested_test": self.suggested_test.as_posix(),
             "score": round(self.score, 3),
+            "score_parts": self.score_parts.to_dict(),
             "risk": self.risk.value,
         }
+
+
+@dataclass(frozen=True)
+class Totals:
+    """Counts for the filtered gap set (before ``--top``)."""
+
+    matched: int = 0
+    shown: int = 0
+    high: int = 0
+    medium: int = 0
+    low: int = 0
+    none: int = 0
+    indirect: int = 0
+    weak: int = 0
+    meaningful: int = 0
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "matched": self.matched,
+            "shown": self.shown,
+            "risk": {"HIGH": self.high, "MEDIUM": self.medium, "LOW": self.low},
+            "checks": {
+                "none": self.none,
+                "indirect": self.indirect,
+                "weak": self.weak,
+                "meaningful": self.meaningful,
+            },
+        }
+
+
+def totals_from_gaps(gaps: tuple[Gap, ...] | list[Gap], *, shown: int | None = None) -> Totals:
+    items = tuple(gaps)
+    return Totals(
+        matched=len(items),
+        shown=len(items) if shown is None else shown,
+        high=sum(1 for gap in items if gap.risk is Risk.HIGH),
+        medium=sum(1 for gap in items if gap.risk is Risk.MEDIUM),
+        low=sum(1 for gap in items if gap.risk is Risk.LOW),
+        none=sum(1 for gap in items if gap.kind is TestKind.NONE),
+        indirect=sum(1 for gap in items if gap.kind is TestKind.INDIRECT),
+        weak=sum(1 for gap in items if gap.kind is TestKind.WEAK),
+        meaningful=sum(1 for gap in items if gap.kind is TestKind.MEANINGFUL),
+    )
 
 
 @dataclass(frozen=True)
@@ -134,11 +272,21 @@ class GapReport:
     changed: ChangedCoverage | None
     suggested_target: Path | None
     coverage_source: Path = field(default_factory=lambda: Path("."))
+    matched: int = 0
+    worst_risk: Risk | None = None
+    weak_matched: int = 0
+    totals: Totals = field(default_factory=Totals)
+    changed_only: bool = False
+    stale_coverage: bool = False
 
     def to_dict(self) -> dict[str, object]:
         payload = {
             "version": self.version,
             "root": str(self.root),
+            "matched": self.matched,
+            "weak_matched": self.weak_matched,
+            "totals": self.totals.to_dict(),
+            "worst_risk": None if self.worst_risk is None else self.worst_risk.value,
             "coverage": {
                 "source": self.coverage.source.as_posix(),
                 "percent": round(self.coverage.line_percent, 3),
@@ -164,6 +312,8 @@ class GapReport:
             "suggested_target": (
                 None if self.suggested_target is None else self.suggested_target.as_posix()
             ),
+            "changed_only": self.changed_only,
+            "stale_coverage": self.stale_coverage,
         }
         return payload
 

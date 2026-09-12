@@ -12,14 +12,22 @@ import os
 import sys
 import traceback
 
+from .config import load_settings
 from .discover import resolve_repo_path
 from .doctor import inspect_environment, print_doctor
-from .engine import analyze
+from .engine import Options, analyze
 from .errors import GapError
-from .models import ChangedCoverage
+from .models import ChangedCoverage, Risk, parse_risk, risk_at_least
 from .report import render_json, render_prompt, render_text
 from .ui import configure_ui, get_ui
 from .version import __version__
+
+
+def _risk_arg(value: str) -> Risk:
+    try:
+        return parse_risk(value)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError(str(exc)) from exc
 
 
 def _cli_dispatch() -> int:
@@ -29,16 +37,24 @@ def _cli_dispatch() -> int:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  uvx testrisk                              # zero-install; rank gaps
-  testrisk                                  # Use coverage.json / .coverage
+  pytest --cov --cov-report=json            # generate coverage first
+  uvx testrisk --changed                    # everyday command: this branch
   testrisk --changed                        # Only gaps on git-changed lines
   testrisk --top 10                         # Limit the list
   testrisk --file src/foo.py                # Restrict to one file
+  testrisk --file 'src/foo/**'              # Glob include
+  testrisk --exclude '**/migrations/**'     # Skip generated / noisy paths
   testrisk --json                           # Machine-readable report
   testrisk --prompt                         # Agent task from the evidence
+  testrisk --explain                        # Show score breakdown
+  testrisk --weak-only                      # Gaps with missing or ceremonial tests
   testrisk --fail-under-changed 95          # CI gate on changed-line coverage
+  testrisk --fail-on-risk HIGH              # CI gate on risk
+  testrisk --fail-on-weak                   # CI gate on ceremonial related tests
   testrisk --doctor                         # Check coverage data and git
   python -m testrisk --version              # If testrisk is not on PATH
+
+Defaults can be set in pyproject.toml under [tool.testrisk].
         """,
     )
     parser.add_argument(
@@ -56,20 +72,21 @@ Examples:
     )
     parser.add_argument(
         "--changed",
-        action="store_true",
-        help="Only show gaps that intersect git-changed lines",
+        action=argparse.BooleanOptionalAction,
+        default=None,
+        help="Only show gaps that intersect git-changed lines (default: config or off)",
     )
     parser.add_argument(
         "--base",
         default=None,
         metavar="REF",
-        help="Git ref to diff against (default: origin/main, then main, master, HEAD)",
+        help="Git ref to diff against (default: GITHUB_BASE_REF, origin/main, main, HEAD)",
     )
     parser.add_argument(
         "--top",
         "-n",
         type=int,
-        default=10,
+        default=None,
         metavar="N",
         help="How many gaps to show (default: 10; 0 means all)",
     )
@@ -79,7 +96,34 @@ Examples:
         dest="files",
         action="append",
         metavar="PATH",
-        help="Restrict ranking to this source file (repeatable)",
+        help="Restrict ranking to this source file or glob (repeatable)",
+    )
+    parser.add_argument(
+        "--exclude",
+        "-x",
+        dest="exclude",
+        action="append",
+        metavar="GLOB",
+        help="Skip source paths matching this glob (repeatable; merges with config omit)",
+    )
+    parser.add_argument(
+        "--default-omit",
+        action=argparse.BooleanOptionalAction,
+        default=None,
+        help="Skip __init__.py and migrations/ (default: on; disable with --no-default-omit)",
+    )
+    parser.add_argument(
+        "--min-risk",
+        type=_risk_arg,
+        default=None,
+        metavar="LEVEL",
+        help="Hide gaps below this risk (LOW, MEDIUM, HIGH)",
+    )
+    parser.add_argument(
+        "--weak-only",
+        action=argparse.BooleanOptionalAction,
+        default=None,
+        help="Only show gaps with no meaningful related tests (missing or ceremonial)",
     )
     parser.add_argument(
         "--json",
@@ -92,11 +136,30 @@ Examples:
         help="Print an evidence-based task for an AI coding agent",
     )
     parser.add_argument(
+        "--explain",
+        action=argparse.BooleanOptionalAction,
+        default=None,
+        help="Show how each score was assembled",
+    )
+    parser.add_argument(
         "--fail-under-changed",
         type=float,
         default=None,
         metavar="PCT",
         help="Exit 1 if changed-line coverage is below this percent",
+    )
+    parser.add_argument(
+        "--fail-on-risk",
+        type=_risk_arg,
+        default=None,
+        metavar="LEVEL",
+        help="Exit 1 if any matched gap is at least this risk (LOW, MEDIUM, HIGH)",
+    )
+    parser.add_argument(
+        "--fail-on-weak",
+        action=argparse.BooleanOptionalAction,
+        default=None,
+        help="Exit 1 if any matched gap has ceremonial related tests",
     )
     parser.add_argument(
         "--doctor",
@@ -131,7 +194,7 @@ Examples:
     configure_ui(color=color, quiet=bool(args.quiet and not args.json and not args.prompt))
     ui = get_ui()
 
-    if args.top < 0:
+    if args.top is not None and args.top < 0:
         ui.error("--top must be >= 0")
         return 2
     if args.fail_under_changed is not None and not 0 <= args.fail_under_changed <= 100:
@@ -154,13 +217,42 @@ Examples:
         )
 
     try:
+        settings = load_settings(repo_path)
+    except GapError as exc:
+        ui.error(str(exc))
+        return 1
+
+    changed_only = settings.changed if args.changed is None else args.changed
+    top = settings.top if args.top is None else args.top
+    explain = settings.explain if args.explain is None else args.explain
+    fail_under = (
+        settings.fail_under_changed if args.fail_under_changed is None else args.fail_under_changed
+    )
+    fail_on_risk = settings.fail_on_risk if args.fail_on_risk is None else args.fail_on_risk
+    min_risk = settings.min_risk if args.min_risk is None else args.min_risk
+    weak_only = settings.weak_only if args.weak_only is None else args.weak_only
+    fail_on_weak = settings.fail_on_weak if args.fail_on_weak is None else args.fail_on_weak
+    default_omit = settings.default_omit if args.default_omit is None else args.default_omit
+    base = args.base if args.base is not None else settings.base
+    files = tuple(args.files) if args.files else settings.include
+    omit = tuple(dict.fromkeys([*settings.omit, *(args.exclude or ())]))
+
+    try:
         report = analyze(
-            root=repo_path,
-            coverage=args.coverage,
-            changed_only=args.changed,
-            base=args.base,
-            files=tuple(args.files or ()),
-            top=args.top,
+            options=Options(
+                root=repo_path,
+                coverage=args.coverage,
+                changed_only=changed_only,
+                base=base,
+                files=files,
+                omit=omit,
+                top=top,
+                min_risk=min_risk,
+                weights=settings.weights,
+                weak_only=weak_only,
+                default_omit=default_omit,
+                apply_config=False,
+            )
         )
     except GapError as exc:
         if args.json:
@@ -179,11 +271,42 @@ Examples:
         elif report.gaps:
             print(report.gaps[0].suggested_test.as_posix())
     else:
-        render_text(report)
+        render_text(report, explain=explain)
 
-    if args.fail_under_changed is not None:
-        return _check_changed_floor(report.changed, args.fail_under_changed, args.json)
+    if fail_on_risk is not None:
+        code = _check_risk_floor(report.worst_risk, fail_on_risk, report.matched, args.json)
+        if code != 0:
+            return code
+    if fail_on_weak:
+        code = _check_weak_floor(report.weak_matched, args.json)
+        if code != 0:
+            return code
+    if fail_under is not None:
+        return _check_changed_floor(report.changed, fail_under, args.json)
     return 0
+
+
+def _check_risk_floor(
+    peak: Risk | None,
+    floor: Risk,
+    matched: int,
+    json_output: bool,
+) -> int:
+    if peak is None or not risk_at_least(peak, floor):
+        return 0
+    if not json_output:
+        noun = "gap" if matched == 1 else "gaps"
+        get_ui().error(f"{matched} {noun} meet --fail-on-risk {floor.value} (worst {peak.value})")
+    return 1
+
+
+def _check_weak_floor(weak_matched: int, json_output: bool) -> int:
+    if weak_matched <= 0:
+        return 0
+    if not json_output:
+        noun = "gap" if weak_matched == 1 else "gaps"
+        get_ui().error(f"{weak_matched} {noun} have ceremonial related tests (--fail-on-weak)")
+    return 1
 
 
 def _check_changed_floor(changed: ChangedCoverage | None, floor: float, json_output: bool) -> int:

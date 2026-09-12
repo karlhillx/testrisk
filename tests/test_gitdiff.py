@@ -3,7 +3,13 @@
 import subprocess
 from pathlib import Path
 
-from testrisk.gitdiff import changed_lines, parse_diff, resolve_base
+from testrisk.gitdiff import (
+    changed_lines,
+    ci_base_candidates,
+    dirty_python_files,
+    parse_diff,
+    resolve_base,
+)
 
 
 def test_parse_diff_collects_added_ranges():
@@ -58,7 +64,18 @@ def test_changed_lines_from_real_repo(tmp_path):
     result = changed_lines(tmp_path, "HEAD")
     assert Path("mod.py") in result
     assert result[Path("mod.py")]
+    assert Path("mod.py") in dirty_python_files(tmp_path)
+    extra = tmp_path / "new.py"
+    extra.write_text("x = 1\n", encoding="utf-8")
+    assert Path("new.py") in dirty_python_files(tmp_path)
 
 
 def test_resolve_base_none_outside_git(tmp_path):
     assert resolve_base(tmp_path, None) is None
+
+
+def test_ci_base_candidates(monkeypatch):
+    monkeypatch.delenv("GITHUB_BASE_REF", raising=False)
+    assert ci_base_candidates() == ()
+    monkeypatch.setenv("GITHUB_BASE_REF", "refs/heads/develop")
+    assert ci_base_candidates() == ("origin/develop", "develop")

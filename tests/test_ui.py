@@ -16,6 +16,12 @@ def test_unicode_symbols_when_enabled():
     assert ui.fail == "✗"
 
 
+def test_rule_uses_ascii_when_unicode_off(capsys):
+    ui = Ui(color=False, quiet=False, unicode=False)
+    ui.rule()
+    assert "-" * 20 in capsys.readouterr().out
+
+
 def test_quiet_hides_info_but_not_errors(capsys):
     ui = Ui(color=False, quiet=True, unicode=False)
     ui.info("hidden")

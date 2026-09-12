@@ -1,0 +1,71 @@
+name: testrisk
+description: Rank the highest-value untested Python behavior
+author: Karl Hill
+branding:
+  icon: shield
+  color: yellow
+
+inputs:
+  changed:
+    description: Only rank gaps on git-changed lines
+    default: "true"
+  fail-under-changed:
+    description: Fail if changed-line coverage is below this percent
+    default: ""
+  fail-on-risk:
+    description: Fail if any matched gap is at least this risk (LOW, MEDIUM, HIGH)
+    default: ""
+  fail-on-weak:
+    description: Fail if any matched gap has ceremonial related tests
+    default: ""
+  weak-only:
+    description: Only rank gaps with missing or ceremonial related tests
+    default: "false"
+  base:
+    description: Git ref to diff against (default honors GITHUB_BASE_REF)
+    default: ""
+  extra-args:
+    description: Extra arguments passed to testrisk
+    default: ""
+  version:
+    description: testrisk version to install with uvx (empty means latest)
+    default: ""
+
+runs:
+  using: composite
+  steps:
+    - name: Set up uv
+      uses: astral-sh/setup-uv@v10
+
+    - name: Run testrisk
+      shell: bash
+      working-directory: ${{ github.workspace }}
+      env:
+        GITHUB_BASE_REF: ${{ github.base_ref }}
+      run: |
+        set -euo pipefail
+        pkg="testrisk"
+        if [ -n "${{ inputs.version }}" ]; then
+          pkg="testrisk==${{ inputs.version }}"
+        fi
+        args=()
+        if [ "${{ inputs.changed }}" = "true" ]; then
+          args+=(--changed)
+        fi
+        if [ -n "${{ inputs.fail-under-changed }}" ]; then
+          args+=(--fail-under-changed "${{ inputs.fail-under-changed }}")
+        fi
+        if [ -n "${{ inputs.fail-on-risk }}" ]; then
+          args+=(--fail-on-risk "${{ inputs.fail-on-risk }}")
+        fi
+        if [ "${{ inputs.fail-on-weak }}" = "true" ]; then
+          args+=(--fail-on-weak)
+        fi
+        if [ "${{ inputs.weak-only }}" = "true" ]; then
+          args+=(--weak-only)
+        fi
+        if [ -n "${{ inputs.base }}" ]; then
+          args+=(--base "${{ inputs.base }}")
+        fi
+        # shellcheck disable=SC2086
+        uvx "$pkg" "${args[@]}" ${{ inputs.extra-args }}

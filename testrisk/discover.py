@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import fnmatch
 import os
 from pathlib import Path
 
@@ -11,6 +12,14 @@ COVERAGE_CANDIDATES = (
     "coverage.json",
     "coverage.xml",
     ".coverage",
+)
+
+GENERATE_COVERAGE = "pytest --cov --cov-report=json"
+GENERATE_COVERAGE_ALT = "coverage run -m pytest && coverage json"
+RANK_CHANGED = "testrisk --changed"
+DEFAULT_OMIT = (
+    "**/__init__.py",
+    "**/migrations/**",
 )
 
 _ROOT_MARKERS = (
@@ -70,9 +79,11 @@ def find_coverage_file(root: Path, explicit: Path | None = None) -> Path:
         "No coverage data found.\n\n"
         "  Looked for: coverage.json, coverage.xml, .coverage\n\n"
         "  Generate it with:\n"
-        "    pytest --cov --cov-report=json\n"
+        f"    {GENERATE_COVERAGE}\n"
         "    # or\n"
-        "    coverage run -m pytest && coverage json"
+        f"    {GENERATE_COVERAGE_ALT}\n\n"
+        "  Then rank this branch:\n"
+        f"    {RANK_CHANGED}"
     )
 
 
@@ -115,3 +126,28 @@ def matches_filter(path: Path, needle: Path) -> bool:
     if posix == key or posix.endswith("/" + key):
         return True
     return path_key(Path(path.name)) == key
+
+
+def _is_glob(pattern: str) -> bool:
+    return any(char in pattern for char in "*?[")
+
+
+def matches_glob(path: Path, pattern: str | Path) -> bool:
+    """True if *path* matches a glob or a ``--file``-style suffix."""
+    raw = pattern if isinstance(pattern, str) else pattern.as_posix()
+    pat = raw.replace("\\", "/").lstrip("./")
+    if os.name == "nt":
+        pat = pat.casefold()
+    posix = path_key(path).lstrip("./")
+    if not _is_glob(raw):
+        return matches_filter(path, Path(raw))
+    if fnmatch.fnmatch(posix, pat):
+        return True
+    if not pat.startswith("*/") and fnmatch.fnmatch(posix, f"*/{pat}"):
+        return True
+    return fnmatch.fnmatch(path_key(Path(path.name)), pat)
+
+
+def omitted(path: Path, patterns: tuple[str, ...] | list[str]) -> bool:
+    """True if *path* matches any omit/exclude glob."""
+    return any(matches_glob(path, pattern) for pattern in patterns)

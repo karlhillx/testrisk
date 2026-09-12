@@ -3,6 +3,21 @@
 All notable changes to this project are documented here. This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [Unreleased]
+
+## [1.1.0] — 2026-09-12
+
+### Added
+
+- Config, CI, and ranking knobs: `[tool.testrisk]`, glob `--file` / `--exclude`, `--min-risk` / `--fail-on-risk`, `--explain` (JSON `score_parts`), and `uses: karlhillx/testrisk@v1` with `GITHUB_BASE_REF`.
+- A first-run path people can trust: generate-coverage recipe, stale-coverage warning, `--changed` as the everyday command (`--no-changed` overrides config), default omit of `__init__.py` and `migrations/`, and test labels `none` / `indirect` / `weak` / `meaningful`. Ceremonial related tests no longer count as coverage (`--weak-only`, `--fail-on-weak`).
+- `--prompt` includes numbered source excerpts of uncovered lines.
+
+### Changed
+
+- Related-test detection requires a function mention (and the module or class for short names), not a conventional filename. Suggested paths nest under `tests/` for `src/` trees and deeper packages.
+- Human report is numbered blocks plus a footer (shown / risk / checks / hint). Quiet `<module>` gaps are dropped unless they have uncovered branches or sit on changed lines. README leads with `--changed`.
+
 ## [1.0.0] — 2026-09-12
 
 ### Added
