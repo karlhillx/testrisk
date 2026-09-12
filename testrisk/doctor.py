@@ -73,7 +73,7 @@ def print_doctor(report: DoctorReport, *, json_output: bool = False) -> int:
         return 0 if report.ok else 1
 
     ui = get_ui()
-    ui.title(f"test-gap {report.version}")
+    ui.title(f"testrisk {report.version}")
     ui.blank()
     ui.kv("Python", report.python)
     ui.kv("Repository", str(report.repo))
@@ -89,5 +89,5 @@ def print_doctor(report: DoctorReport, *, json_output: bool = False) -> int:
     if report.ok:
         ui.success("Ready to rank test gaps.")
         return 0
-    ui.error("Generate coverage data, then re-run test-gap.")
+    ui.error("Generate coverage data, then re-run testrisk.")
     return 1

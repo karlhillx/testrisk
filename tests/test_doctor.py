@@ -2,7 +2,7 @@
 
 from helpers import write_coverage_json, write_sample_project
 
-from testgap.doctor import inspect_environment
+from testrisk.doctor import inspect_environment
 
 
 def test_doctor_ok_when_coverage_exists(tmp_path):

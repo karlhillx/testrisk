@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from testgap.discover import (
+from testrisk.discover import (
     find_coverage_file,
     find_repo_root,
     matches_filter,
@@ -13,7 +13,7 @@ from testgap.discover import (
     resolve_repo_path,
     same_relpath,
 )
-from testgap.errors import GapError
+from testrisk.errors import GapError
 
 
 def test_find_repo_root_walks_to_pyproject(tmp_path):

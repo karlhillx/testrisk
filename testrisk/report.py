@@ -11,7 +11,7 @@ from .version import __version__
 
 def render_text(report: GapReport) -> None:
     ui = get_ui()
-    ui.title(f"test-gap {report.version or __version__}", persist=True)
+    ui.title(f"testrisk {report.version or __version__}", persist=True)
     ui.blank(persist=True)
     ui.info(f"Coverage   {_pct(report.coverage.line_percent)}", persist=True)
     if report.coverage.branch_percent is not None:

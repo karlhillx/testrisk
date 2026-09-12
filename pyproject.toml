@@ -3,9 +3,9 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "test-gap"
+name = "testrisk"
 version = "1.0.0"
-description = "Rank the highest-value Python test gaps from coverage, AST, and git"
+description = "Find the code most likely to need better tests"
 readme = "README.md"
 license = "MIT"
 license-files = ["LICENSE"]
@@ -17,7 +17,7 @@ keywords = [
     "pytest",
     "quality",
     "cli",
-    "test-gaps",
+    "test-risk",
 ]
 classifiers = [
     "Development Status :: 5 - Production/Stable",
@@ -39,14 +39,13 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/karlhillx/test-gap"
-Repository = "https://github.com/karlhillx/test-gap"
-Issues = "https://github.com/karlhillx/test-gap/issues"
-Changelog = "https://github.com/karlhillx/test-gap/blob/main/CHANGELOG.md"
+Homepage = "https://github.com/karlhillx/testrisk"
+Repository = "https://github.com/karlhillx/testrisk"
+Issues = "https://github.com/karlhillx/testrisk/issues"
+Changelog = "https://github.com/karlhillx/testrisk/blob/main/CHANGELOG.md"
 
 [project.scripts]
-test-gap = "testgap.cli:main"
-testgap = "testgap.cli:main"
+testrisk = "testrisk.cli:main"
 
 [dependency-groups]
 test = [
@@ -63,14 +62,14 @@ dev = [
 default-groups = ["dev"]
 
 [tool.hatch.build.targets.wheel]
-packages = ["testgap"]
+packages = ["testrisk"]
 
 [tool.hatch.build.targets.wheel.force-include]
-"testgap/py.typed" = "testgap/py.typed"
+"testrisk/py.typed" = "testrisk/py.typed"
 
 [tool.hatch.build.targets.sdist]
 include = [
-    "/testgap",
+    "/testrisk",
     "/tests",
     "/README.md",
     "/LICENSE",
@@ -93,7 +92,7 @@ addopts = "-v --tb=short"
 python-version = "3.12"
 
 [tool.ty.src]
-include = ["testgap"]
+include = ["testrisk"]
 
 [tool.ruff]
 target-version = "py312"
@@ -112,4 +111,4 @@ select = [
 ]
 
 [tool.ruff.lint.isort]
-known-first-party = ["testgap"]
+known-first-party = ["testrisk"]

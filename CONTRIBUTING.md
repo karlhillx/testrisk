@@ -1,12 +1,12 @@
 # Contributing
 
-Thanks for helping improve test-gap.
+Thanks for helping improve testrisk.
 
 ## Development setup
 
 ```bash
-git clone https://github.com/karlhillx/test-gap.git
-cd test-gap
+git clone https://github.com/karlhillx/testrisk.git
+cd testrisk
 uv sync
 ```
 
@@ -16,21 +16,21 @@ uv sync
 
 ```bash
 uv run pytest tests/
-uv run ruff check testgap tests
-uv run ruff format --check testgap tests
+uv run ruff check testrisk tests
+uv run ruff format --check testrisk tests
 uv run ty check
 ```
 
 Optional coverage:
 
 ```bash
-uv run pytest --cov=testgap --cov-report=term-missing tests/
+uv run pytest --cov=testrisk --cov-report=term-missing tests/
 ```
 
 CLI smoke test (same as CI):
 
 ```bash
-uv run python -m testgap --version
+uv run python -m testrisk --version
 ```
 
 ## Releases

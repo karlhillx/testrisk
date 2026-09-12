@@ -13,10 +13,11 @@ All notable changes to this project are documented here. This project follows [S
 - Walk-up discovery of a repo root (`pyproject.toml` / `.git`) when `--repo` is `.`.
 - Human report, JSON report, and an evidence-based `--prompt` for coding agents.
 - Library export: `analyze`, `Gap`, `GapError`, `GapReport`, `Options`, `Risk`, `find_repo_root`.
-- Type-check `testgap` with [ty](https://docs.astral.sh/ty/) (`uv run ty check`) in the `dev` group and CI.
-- Ship `py.typed` so installers and type checkers treat test-gap as typed.
+- Type-check `testrisk` with [ty](https://docs.astral.sh/ty/) (`uv run ty check`) in the `dev` group and CI.
+- Ship `py.typed` so installers and type checkers treat testrisk as typed.
 
 ### Changed
 
-- Library imports no longer pull in the CLI. Catch `GapError` from `testgap`.
+- Published as **testrisk** (PyPI, import, and CLI). `test-gap` / `testgap` were unavailable.
+- Library imports no longer pull in the CLI. Catch `GapError` from `testrisk`.
 - Git diffs honor `--repo` even if `GIT_DIR` is set, and decode as UTF-8.

@@ -4,7 +4,7 @@ from pathlib import Path
 
 from helpers import write_sample_project
 
-from testgap.tests_map import is_test_path, iter_test_files, related_tests, suggested_test_path
+from testrisk.tests_map import is_test_path, iter_test_files, related_tests, suggested_test_path
 
 
 def test_is_test_path():

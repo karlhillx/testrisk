@@ -1,6 +1,6 @@
 """Tests for terminal output helpers."""
 
-from testgap.ui import Ui, resolve_color
+from testrisk.ui import Ui, resolve_color
 
 
 def test_ascii_symbols_when_unicode_off():

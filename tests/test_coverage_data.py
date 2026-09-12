@@ -5,8 +5,8 @@ from pathlib import Path
 from coverage import Coverage
 from helpers import write_coverage_json, write_sample_project
 
-from testgap.coverage_data import load_coverage
-from testgap.models import format_line_ranges
+from testrisk.coverage_data import load_coverage
+from testrisk.models import format_line_ranges
 
 
 def test_format_line_ranges():

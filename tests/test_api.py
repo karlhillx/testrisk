@@ -1,10 +1,10 @@
 """Stable public library surface."""
 
-import testgap
+import testrisk
 
 
 def test_public_exports():
-    assert set(testgap.__all__) == {
+    assert set(testrisk.__all__) == {
         "Gap",
         "GapError",
         "GapReport",
@@ -14,12 +14,12 @@ def test_public_exports():
         "analyze",
         "find_repo_root",
     }
-    for name in testgap.__all__:
-        assert getattr(testgap, name) is not None
+    for name in testrisk.__all__:
+        assert getattr(testrisk, name) is not None
 
 
 def test_gap_error_is_usable():
-    from testgap import GapError
+    from testrisk import GapError
 
     assert issubclass(GapError, Exception)
     try:

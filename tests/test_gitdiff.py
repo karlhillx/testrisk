@@ -3,7 +3,7 @@
 import subprocess
 from pathlib import Path
 
-from testgap.gitdiff import changed_lines, parse_diff, resolve_base
+from testrisk.gitdiff import changed_lines, parse_diff, resolve_base
 
 
 def test_parse_diff_collects_added_ranges():

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-test-gap CLI — rank the highest-value Python test gaps.
+testrisk CLI — rank the highest-value Python test gaps.
 """
 
 from __future__ import annotations
@@ -24,21 +24,21 @@ from .version import __version__
 
 def _cli_dispatch() -> int:
     parser = argparse.ArgumentParser(
-        prog="test-gap",
+        prog="testrisk",
         description="Rank the highest-value untested Python behavior",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  uvx test-gap                              # zero-install; rank gaps
-  test-gap                                  # Use coverage.json / .coverage
-  test-gap --changed                        # Only gaps on git-changed lines
-  test-gap --top 10                         # Limit the list
-  test-gap --file src/foo.py                # Restrict to one file
-  test-gap --json                           # Machine-readable report
-  test-gap --prompt                         # Agent task from the evidence
-  test-gap --fail-under-changed 95          # CI gate on changed-line coverage
-  test-gap --doctor                         # Check coverage data and git
-  python3 -m testgap --version              # If test-gap is not on PATH
+  uvx testrisk                              # zero-install; rank gaps
+  testrisk                                  # Use coverage.json / .coverage
+  testrisk --changed                        # Only gaps on git-changed lines
+  testrisk --top 10                         # Limit the list
+  testrisk --file src/foo.py                # Restrict to one file
+  testrisk --json                           # Machine-readable report
+  testrisk --prompt                         # Agent task from the evidence
+  testrisk --fail-under-changed 95          # CI gate on changed-line coverage
+  testrisk --doctor                         # Check coverage data and git
+  python -m testrisk --version              # If testrisk is not on PATH
         """,
     )
     parser.add_argument(
@@ -231,13 +231,13 @@ def main() -> int:
         return 0
     except Exception as exc:
         ui = get_ui()
-        ui.error("test-gap hit an unexpected error.")
+        ui.error("testrisk hit an unexpected error.")
         ui.error(f"{type(exc).__name__}: {exc}")
-        if "--verbose" in sys.argv or os.environ.get("TEST_GAP_DEBUG"):
+        if "--verbose" in sys.argv or os.environ.get("TESTRISK_DEBUG"):
             traceback.print_exc()
         else:
             ui.note(
-                "Re-run with --verbose or TEST_GAP_DEBUG=1 for a traceback.",
+                "Re-run with --verbose or TESTRISK_DEBUG=1 for a traceback.",
                 persist=True,
             )
         return 1

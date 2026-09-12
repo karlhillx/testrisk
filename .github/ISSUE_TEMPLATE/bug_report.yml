@@ -1,5 +1,5 @@
 name: Bug report
-description: Report incorrect behavior or a crash in test-gap
+description: Report incorrect behavior or a crash in testrisk
 body:
   - type: markdown
     attributes:
@@ -9,8 +9,8 @@ body:
   - type: input
     id: version
     attributes:
-      label: test-gap version
-      description: Output of `test-gap --version` or `python3 -m testgap --version`
+      label: testrisk version
+      description: Output of `testrisk --version` or `python -m testrisk --version`
       placeholder: e.g. 1.0.0
     validations:
       required: true
@@ -56,5 +56,5 @@ body:
     id: command
     attributes:
       label: Command
-      description: The exact `test-gap` invocation (redact secrets).
+      description: The exact `testrisk` invocation (redact secrets).
       render: bash

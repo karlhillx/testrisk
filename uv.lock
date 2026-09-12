@@ -202,7 +202,7 @@ wheels = [
 ]
 
 [[package]]
-name = "test-gap"
+name = "testrisk"
 version = "1.0.0"
 source = { editable = "." }
 dependencies = [

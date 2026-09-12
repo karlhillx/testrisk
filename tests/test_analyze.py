@@ -4,9 +4,9 @@ from pathlib import Path
 
 from helpers import write_coverage_json, write_sample_project
 
-import testgap.engine as engine
-from testgap import analyze
-from testgap.models import Risk
+import testrisk.engine as engine
+from testrisk import analyze
+from testrisk.models import Risk
 
 
 def test_analyze_ranks_uncovered_method_first(tmp_path):

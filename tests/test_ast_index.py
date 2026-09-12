@@ -4,7 +4,7 @@ from pathlib import Path
 
 from helpers import SAMPLE_SOURCE
 
-from testgap.ast_index import index_file, innermost, module_complexity
+from testrisk.ast_index import index_file, innermost, module_complexity
 
 
 def test_index_names_methods_and_functions():

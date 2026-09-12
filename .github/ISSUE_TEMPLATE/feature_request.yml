@@ -5,7 +5,7 @@ body:
     id: problem
     attributes:
       label: Problem or use case
-      description: What are you trying to do with test-gap today?
+      description: What are you trying to do with testrisk today?
     validations:
       required: true
 
@@ -13,7 +13,7 @@ body:
     id: proposal
     attributes:
       label: Proposed behavior
-      description: How should test-gap behave instead?
+      description: How should testrisk behave instead?
     validations:
       required: true
 

@@ -7,12 +7,12 @@ from pathlib import Path
 import pytest
 from helpers import write_coverage_json, write_sample_project
 
-import testgap.engine as engine
-from testgap import cli
+import testrisk.engine as engine
+from testrisk import cli
 
 
 def _run(monkeypatch, argv: list[str]) -> int:
-    monkeypatch.setattr(sys, "argv", ["test-gap", *argv])
+    monkeypatch.setattr(sys, "argv", ["testrisk", *argv])
     return cli.main()
 
 
@@ -125,8 +125,8 @@ def test_cli_doctor_json(tmp_path, monkeypatch, capsys):
 
 
 def test_package_main_help(monkeypatch, capsys):
-    monkeypatch.setattr(sys, "argv", ["testgap", "--help"])
-    from testgap.__main__ import _main
+    monkeypatch.setattr(sys, "argv", ["testrisk", "--help"])
+    from testrisk.__main__ import _main
 
     with pytest.raises(SystemExit) as exc:
         _main()

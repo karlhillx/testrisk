@@ -1,10 +1,10 @@
 """
-test-gap — rank the highest-value Python test gaps.
+testrisk — find the code most likely to need better tests.
 
 Reads coverage.py data, maps uncovered lines onto functions via the AST,
 weights git-changed code and missing tests, and prints a prioritized list::
 
-    from testgap import GapError, analyze
+    from testrisk import GapError, analyze
 
     report = analyze(".")
     for gap in report.gaps:

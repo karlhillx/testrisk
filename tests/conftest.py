@@ -2,7 +2,7 @@
 
 import pytest
 
-from testgap.ui import configure_ui
+from testrisk.ui import configure_ui
 
 
 @pytest.fixture(autouse=True)

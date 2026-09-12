@@ -1,4 +1,4 @@
-"""Allow ``python -m testgap`` and ``uv run testgap`` (the package directory)."""
+"""Allow ``python -m testrisk`` and ``uv run testrisk`` (the package directory)."""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ def _main() -> int:
         root_s = str(root)
         if root_s not in sys.path:
             sys.path.insert(0, root_s)
-        from testgap.cli import main
+        from testrisk.cli import main
     else:
         from .cli import main
     return main()

@@ -3,7 +3,7 @@
 import json
 from pathlib import Path
 
-from testgap.models import (
+from testrisk.models import (
     BranchGap,
     ChangedCoverage,
     CoverageSnapshot,
@@ -12,7 +12,7 @@ from testgap.models import (
     GapReport,
     Risk,
 )
-from testgap.report import build_prompt, render_json, render_text
+from testrisk.report import build_prompt, render_json, render_text
 
 
 def _report(gaps: tuple[Gap, ...]) -> GapReport:
@@ -59,7 +59,7 @@ def test_render_text_matches_shape(capsys):
     )
     render_text(_report((gap,)))
     out = capsys.readouterr().out
-    assert "test-gap 1.0.0" in out
+    assert "testrisk 1.0.0" in out
     assert "Coverage   91.7%" in out
     assert "Branch     84.2%" in out
     assert "demo/services.py::ServiceManager.start" in out

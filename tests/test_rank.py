@@ -1,7 +1,7 @@
 """Ranking weights and risk bands."""
 
-from testgap.models import Risk
-from testgap.rank import classify_risk, score_gap
+from testrisk.models import Risk
+from testrisk.rank import classify_risk, score_gap
 
 
 def test_changed_uncovered_outweighs_raw_missing_lines():

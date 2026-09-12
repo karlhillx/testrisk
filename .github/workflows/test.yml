@@ -32,10 +32,10 @@ jobs:
       run: uv sync --frozen
 
     - name: Module entrypoint smoke test
-      run: uv run python -m testgap --version
+      run: uv run python -m testrisk --version
 
     - name: Run tests
-      run: uv run pytest --cov=testgap --cov-report=xml tests/
+      run: uv run pytest --cov=testrisk --cov-report=xml tests/
 
     - name: Upload coverage
       if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12'
@@ -59,10 +59,10 @@ jobs:
       run: uv sync --frozen
 
     - name: Lint with Ruff
-      run: uv run ruff check testgap tests
+      run: uv run ruff check testrisk tests
 
     - name: Format with Ruff
-      run: uv run ruff format --check testgap tests
+      run: uv run ruff format --check testrisk tests
 
     - name: Type check with ty
       run: uv run ty check
@@ -92,8 +92,8 @@ jobs:
         sdists = list(dist.glob("*.tar.gz"))
         assert wheels and sdists, f"missing artifacts in {list(dist.iterdir())}"
         names = zipfile.ZipFile(wheels[0]).namelist()
-        assert any(name.endswith("testgap/py.typed") for name in names), names
-        assert any(name.endswith("testgap/__init__.py") for name in names), names
+        assert any(name.endswith("testrisk/py.typed") for name in names), names
+        assert any(name.endswith("testrisk/__init__.py") for name in names), names
         assert not any(name.startswith("tests/") for name in names), names
         print("wheel ok:", wheels[0].name)
         print("sdist ok:", sdists[0].name)

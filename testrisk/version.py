@@ -1,11 +1,11 @@
-"""Package version without importing the rest of ``testgap``."""
+"""Package version without importing the rest of ``testrisk``."""
 
 from importlib.metadata import PackageNotFoundError, version
 
 
 def package_version() -> str:
     try:
-        return version("test-gap")
+        return version("testrisk")
     except PackageNotFoundError:
         return "0.0.0+source"
 

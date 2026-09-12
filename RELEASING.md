@@ -1,4 +1,4 @@
-# Releasing test-gap
+# Releasing testrisk
 
 PyPI uploads use **trusted publishing** from GitHub Actions (see [.github/workflows/publish.yml](.github/workflows/publish.yml) and [PyPI: adding a publisher](https://docs.pypi.org/trusted-publishers/adding-a-publisher/)).
 
@@ -18,9 +18,9 @@ Use **workflow_dispatch** on that workflow only if you need a manual retry after
 ```bash
 uv sync --frozen
 uv run pytest tests/
-uv run ruff check testgap tests
-uv run ruff format --check testgap tests
+uv run ruff check testrisk tests
+uv run ruff format --check testrisk tests
 uv run ty check
-uv run python -m testgap --version
-uv run python -m testgap --doctor
+uv run python -m testrisk --version
+uv run python -m testrisk --doctor
 ```
