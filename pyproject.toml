@@ -1,0 +1,115 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "test-gap"
+version = "1.0.0"
+description = "Rank the highest-value Python test gaps from coverage, AST, and git"
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+requires-python = ">=3.12"
+authors = [{ name = "Karl Hill", email = "karlhillx@gmail.com" }]
+keywords = [
+    "coverage",
+    "testing",
+    "pytest",
+    "quality",
+    "cli",
+    "test-gaps",
+]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Software Development :: Quality Assurance",
+    "Topic :: Software Development :: Testing",
+    "Typing :: Typed",
+]
+dependencies = [
+    "coverage>=7.6,<8",
+]
+
+[project.urls]
+Homepage = "https://github.com/karlhillx/test-gap"
+Repository = "https://github.com/karlhillx/test-gap"
+Issues = "https://github.com/karlhillx/test-gap/issues"
+Changelog = "https://github.com/karlhillx/test-gap/blob/main/CHANGELOG.md"
+
+[project.scripts]
+test-gap = "testgap.cli:main"
+testgap = "testgap.cli:main"
+
+[dependency-groups]
+test = [
+    "pytest>=9.1",
+    "pytest-cov>=7.1",
+]
+dev = [
+    { include-group = "test" },
+    "ruff>=0.16",
+    "ty>=0.0.75",
+]
+
+[tool.uv]
+default-groups = ["dev"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["testgap"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"testgap/py.typed" = "testgap/py.typed"
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "/testgap",
+    "/tests",
+    "/README.md",
+    "/LICENSE",
+    "/CHANGELOG.md",
+    "/CONTRIBUTING.md",
+    "/RELEASING.md",
+    "/SECURITY.md",
+    "/pyproject.toml",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "-v --tb=short"
+
+[tool.ty.environment]
+python-version = "3.12"
+
+[tool.ty.src]
+include = ["testgap"]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+
+[tool.ruff.lint]
+select = [
+    "E",
+    "F",
+    "I",
+    "UP",
+    "B",
+    "C4",
+    "SIM",
+    "RUF",
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["testgap"]

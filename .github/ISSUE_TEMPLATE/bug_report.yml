@@ -1,0 +1,60 @@
+name: Bug report
+description: Report incorrect behavior or a crash in test-gap
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for the report. The more detail you provide, the faster we can reproduce it.
+
+  - type: input
+    id: version
+    attributes:
+      label: test-gap version
+      description: Output of `test-gap --version` or `python3 -m testgap --version`
+      placeholder: e.g. 1.0.0
+    validations:
+      required: true
+
+  - type: input
+    id: python
+    attributes:
+      label: Python version
+      description: Output of `python3 --version`
+      placeholder: e.g. Python 3.12.8
+    validations:
+      required: true
+
+  - type: input
+    id: os
+    attributes:
+      label: Operating system
+      placeholder: e.g. macOS 15, Ubuntu 24.04, Windows 11
+    validations:
+      required: true
+
+  - type: dropdown
+    id: input
+    attributes:
+      label: Coverage input
+      options:
+        - coverage.json
+        - coverage.xml
+        - .coverage
+        - none / doctor only
+    validations:
+      required: true
+
+  - type: textarea
+    id: what_happened
+    attributes:
+      label: What happened?
+      description: What you expected vs what you saw; paste full terminal output if helpful.
+    validations:
+      required: true
+
+  - type: textarea
+    id: command
+    attributes:
+      label: Command
+      description: The exact `test-gap` invocation (redact secrets).
+      render: bash

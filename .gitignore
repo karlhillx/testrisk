@@ -1,0 +1,46 @@
+# Bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+.venv/
+venv/
+
+# Packaging / install
+build/
+dist/
+wheels/
+*.egg-info/
+*.egg
+.eggs/
+__pypackages__/
+
+# Secrets and local overrides
+.env
+.env.*
+!.env.example
+*.local
+
+# Test, coverage, lint, type-check
+.pytest_cache/
+.ruff_cache/
+.ty_cache/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+coverage.json
+
+# Editor / OS
+.idea/
+.vscode/
+*.swp
+*~
+.DS_Store
+Thumbs.db
+
+# Logs and scratch files
+*.log
+*.tmp
+*.bak

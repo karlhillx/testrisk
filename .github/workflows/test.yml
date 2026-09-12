@@ -1,0 +1,100 @@
+name: Test
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest]
+        python-version: ["3.12", "3.13", "3.14"]
+        include:
+          - os: macos-latest
+            python-version: "3.12"
+          - os: windows-latest
+            python-version: "3.12"
+
+    steps:
+    - uses: actions/checkout@v6
+
+    - name: Set up uv
+      uses: astral-sh/setup-uv@v10.0.1
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Install dependencies
+      run: uv sync --frozen
+
+    - name: Module entrypoint smoke test
+      run: uv run python -m testgap --version
+
+    - name: Run tests
+      run: uv run pytest --cov=testgap --cov-report=xml tests/
+
+    - name: Upload coverage
+      if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12'
+      uses: codecov/codecov-action@v5
+      with:
+        files: ./coverage.xml
+        fail_ci_if_error: false
+
+  lint:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v6
+
+    - name: Set up uv
+      uses: astral-sh/setup-uv@v10.0.1
+      with:
+        python-version: "3.12"
+
+    - name: Install dependencies
+      run: uv sync --frozen
+
+    - name: Lint with Ruff
+      run: uv run ruff check testgap tests
+
+    - name: Format with Ruff
+      run: uv run ruff format --check testgap tests
+
+    - name: Type check with ty
+      run: uv run ty check
+
+  package:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v6
+
+    - name: Set up uv
+      uses: astral-sh/setup-uv@v10.0.1
+      with:
+        python-version: "3.12"
+
+    - name: Build sdist and wheel
+      run: uv build
+
+    - name: Check metadata and wheel contents
+      run: |
+        uv run --no-project python - <<'PY'
+        from pathlib import Path
+        import zipfile
+
+        dist = Path("dist")
+        wheels = list(dist.glob("*.whl"))
+        sdists = list(dist.glob("*.tar.gz"))
+        assert wheels and sdists, f"missing artifacts in {list(dist.iterdir())}"
+        names = zipfile.ZipFile(wheels[0]).namelist()
+        assert any(name.endswith("testgap/py.typed") for name in names), names
+        assert any(name.endswith("testgap/__init__.py") for name in names), names
+        assert not any(name.startswith("tests/") for name in names), names
+        print("wheel ok:", wheels[0].name)
+        print("sdist ok:", sdists[0].name)
+        PY
