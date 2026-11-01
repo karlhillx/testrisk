@@ -47,6 +47,9 @@ Changelog = "https://github.com/karlhillx/testrisk/blob/main/CHANGELOG.md"
 [project.scripts]
 testrisk = "testrisk.cli:main"
 
+[project.entry-points.pytest11]
+testrisk = "testrisk.plugin"
+
 [dependency-groups]
 test = [
     "pytest>=9.1",

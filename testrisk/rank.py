@@ -16,6 +16,8 @@ class Weights:
     complexity: float = 0.75
     changed_uncovered: float = 3.0
     no_tests: float = 4.0
+    churn: float = 0.25
+    fan_in: float = 0.4
 
 
 DEFAULT_WEIGHTS = Weights()
@@ -28,6 +30,8 @@ def score_gap(
     complexity: int,
     changed_uncovered: int,
     has_tests: bool,
+    churn: int = 0,
+    fan_in: int = 0,
     weights: Weights | None = None,
 ) -> tuple[float, Risk, ScoreParts]:
     """
@@ -35,6 +39,7 @@ def score_gap(
 
     Weights favor changed uncovered lines and untested branches over raw
     missing-line count, then lift complex functions and code with no tests.
+    Churn and fan-in are capped so history cannot drown the coverage signals.
     """
     chosen = weights or DEFAULT_WEIGHTS
     parts = ScoreParts(
@@ -43,6 +48,8 @@ def score_gap(
         complexity=max(0, complexity - 1) * chosen.complexity,
         changed_uncovered=changed_uncovered * chosen.changed_uncovered,
         no_tests=0.0 if has_tests else chosen.no_tests,
+        churn=min(max(churn, 0), 12) * chosen.churn,
+        fan_in=min(max(fan_in, 0), 10) * chosen.fan_in,
     )
     value = parts.total
     return (

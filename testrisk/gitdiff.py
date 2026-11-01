@@ -99,6 +99,27 @@ def changed_lines(root: Path, base: str | None) -> dict[Path, frozenset[int]]:
     return parse_diff(result.stdout)
 
 
+def file_commit_counts(root: Path, *, since: str = "90.days") -> dict[Path, int]:
+    """How often each ``.py`` file changed in *since* (git log name-only)."""
+    if not is_git_repo(root):
+        return {}
+    result = _run_git(
+        root,
+        ["log", "--pretty=format:", "--name-only", f"--since={since}", "--", "*.py"],
+        timeout=20,
+    )
+    if result is None or result.returncode != 0:
+        return {}
+    counts: dict[Path, int] = {}
+    for line in result.stdout.splitlines():
+        text = line.strip().replace("\\", "/")
+        if not text.endswith(".py"):
+            continue
+        path = Path(text)
+        counts[path] = counts.get(path, 0) + 1
+    return counts
+
+
 def dirty_python_files(root: Path) -> tuple[Path, ...]:
     """Modified, staged, or untracked ``.py`` files in the working tree."""
     if not is_git_repo(root):

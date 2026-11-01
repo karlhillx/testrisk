@@ -35,7 +35,8 @@ def test_parse_settings_kebab_and_aliases():
             "weak-only": True,
             "fail-on-weak": True,
             "default-omit": False,
-            "weights": {"changed-uncovered": 5.0},
+            "baseline": ".testrisk-baseline",
+            "weights": {"changed-uncovered": 5.0, "churn": 0.5, "fan-in": 0.2},
         }
     )
     assert settings.base == "origin/develop"
@@ -50,7 +51,10 @@ def test_parse_settings_kebab_and_aliases():
     assert settings.weak_only is True
     assert settings.fail_on_weak is True
     assert settings.default_omit is False
+    assert settings.baseline == ".testrisk-baseline"
     assert settings.weights.changed_uncovered == 5.0
+    assert settings.weights.churn == 0.5
+    assert settings.weights.fan_in == 0.2
     assert settings.weights.missing_lines == 1.0
 
 

@@ -24,6 +24,7 @@ def test_load_json(tmp_path):
         missing_branches=[[4, 0], [8, -1]],
         line_percent=91.7,
         branch_percent=84.2,
+        contexts={"5": ["tests/test_services.py::test_parse_config_empty"]},
     )
     snap = load_coverage(tmp_path, tmp_path / "coverage.json")
     assert round(snap.line_percent, 1) == 91.7
@@ -33,6 +34,8 @@ def test_load_json(tmp_path):
     assert file_cov.missing_lines == frozenset({8, 9})
     assert file_cov.missing_branches[0].describe() == "line 4: false branch"
     assert file_cov.missing_branches[1].describe() == "line 8: exception/exit branch"
+    assert file_cov.has_contexts
+    assert file_cov.contexts[5] == ("tests/test_services.py::test_parse_config_empty",)
 
 
 def test_load_xml(tmp_path):

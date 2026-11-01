@@ -6,7 +6,10 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from .ast_index import index_file, innermost, module_complexity
+from .baseline import DEFAULT_BASELINE, load_baseline, resolve_baseline
+from .baseline import write_baseline as dump_baseline
 from .config import Settings, load_settings
+from .contexts import executed_by, paths_for_contexts
 from .coverage_data import load_coverage
 from .discover import (
     DEFAULT_OMIT,
@@ -18,7 +21,8 @@ from .discover import (
     same_relpath,
 )
 from .freshness import coverage_is_stale
-from .gitdiff import changed_lines, resolve_base
+from .gitdiff import changed_lines, file_commit_counts, resolve_base
+from .impact import fan_in_counts
 from .models import (
     BranchGap,
     ChangedCoverage,
@@ -54,6 +58,8 @@ class Options:
     weights: Weights | None = None
     weak_only: bool = False
     default_omit: bool = True
+    baseline: Path | str | None = None
+    write_baseline: bool = False
     apply_config: bool = True
 
 
@@ -77,6 +83,8 @@ def analyze(
     weights: Weights | None = None,
     weak_only: bool = False,
     default_omit: bool = True,
+    baseline: Path | str | None = None,
+    write_baseline: bool = False,
     options: Options | None = None,
 ) -> GapReport:
     """
@@ -111,6 +119,10 @@ def analyze(
         Keep gaps with no meaningful related tests (missing or ceremonial).
     default_omit:
         Skip ``__init__.py`` and ``migrations/`` unless disabled.
+    baseline:
+        Waive these qualnames from gates (default: ``.testrisk-baseline`` if present).
+    write_baseline:
+        Replace the baseline file with the current matched set.
     options:
         If given, the other arguments are ignored (config ``omit`` still merges).
 
@@ -131,6 +143,8 @@ def analyze(
         weights=weights,
         weak_only=weak_only,
         default_omit=default_omit,
+        baseline=baseline,
+        write_baseline=write_baseline,
     )
     repo = resolve_repo_path(str(chosen.root))
     settings = load_settings(repo) if chosen.apply_config else Settings()
@@ -153,6 +167,9 @@ def analyze(
     resolved_base = resolve_base(repo, git_base)
     changed_map = changed_lines(repo, resolved_base)
     inventory = iter_test_files(repo)
+    churn_map = file_commit_counts(repo)
+    fan_map = fan_in_counts(repo)
+    has_contexts = any(file_cov.has_contexts for file_cov in snapshot.files)
 
     gaps: list[Gap] = []
     changed_statements = 0
@@ -183,6 +200,8 @@ def analyze(
                 rel_changed=rel_changed,
                 inventory=inventory,
                 weights=ranking_weights,
+                churn=_lookup_count(file_cov.path, churn_map),
+                fan_in=_lookup_count(file_cov.path, fan_map),
             )
         )
 
@@ -193,6 +212,19 @@ def analyze(
         ranked = tuple(gap for gap in ranked if risk_at_least(gap.risk, risk_floor))
     if weak_only:
         ranked = tuple(gap for gap in ranked if not gap.has_meaningful_tests)
+    baseline_path = resolve_baseline(
+        repo,
+        chosen.baseline if chosen.baseline is not None else settings.baseline,
+    )
+    snapshot_names = tuple(gap.qualname for gap in ranked)
+    waived_names: tuple[str, ...] = ()
+    if baseline_path is not None and baseline_path.is_file() and not chosen.write_baseline:
+        waived = load_baseline(baseline_path)
+        waived_names = tuple(name for name in snapshot_names if name in waived)
+        ranked = tuple(gap for gap in ranked if gap.qualname not in waived)
+    if chosen.write_baseline:
+        target = baseline_path or (repo / DEFAULT_BASELINE)
+        dump_baseline(target, snapshot_names)
     matched = len(ranked)
     peak = worst_risk([gap.risk for gap in ranked])
     weak_matched = sum(1 for gap in ranked if gap.weak_tests)
@@ -228,6 +260,8 @@ def analyze(
         totals=totals,
         changed_only=changed,
         stale_coverage=coverage_is_stale(repo, coverage_path, changed_map),
+        has_contexts=has_contexts,
+        waived=waived_names,
     )
 
 
@@ -239,6 +273,15 @@ def _file_matches(path: Path, filters: tuple[str, ...]) -> bool:
     if not filters:
         return True
     return any(matches_glob(path, item) for item in filters)
+
+
+def _lookup_count(path: Path, mapping: dict[Path, int]) -> int:
+    if path in mapping:
+        return mapping[path]
+    for candidate, value in mapping.items():
+        if same_relpath(path, candidate):
+            return value
+    return 0
 
 
 def _changed_for(path: Path, changed: dict[Path, frozenset[int]]) -> frozenset[int]:
@@ -267,6 +310,8 @@ def _gaps_for_file(
     rel_changed: frozenset[int],
     inventory: tuple[Path, ...],
     weights: Weights,
+    churn: int,
+    fan_in: int,
 ) -> list[Gap]:
     rel = relativize(file_cov.path, repo)
     try:
@@ -329,17 +374,23 @@ def _gaps_for_file(
         changed_uncovered = tuple(line for line in missing if line in rel_changed)
         if bucket.span.name == "<module>" and not unique_branches and not changed_uncovered:
             continue
+        ran = executed_by(file_cov, bucket.span)
+        context_paths = paths_for_contexts(ran, root=repo)
         existing = related_tests(repo, rel, bucket.span.name, inventory=inventory)
+        if context_paths:
+            existing = tuple(dict.fromkeys((*context_paths, *existing)))
         suggested = existing[0] if existing else suggested_test_path(rel, inventory=inventory)
         weak_paths, weak_reasons = _weak_related(repo, existing, bucket.span.name)
-        kind = _test_kind(repo, suggested, existing, weak_paths)
-        meaningful = kind is TestKind.MEANINGFUL
+        kind = _test_kind(repo, suggested, existing, weak_paths, executed_by=ran)
+        meaningful = kind is TestKind.MEANINGFUL or bool(ran)
         value, risk, parts = score_gap(
             missing_lines=len(missing),
             missing_branches=len(unique_branches),
             complexity=bucket.span.complexity,
             changed_uncovered=len(changed_uncovered),
             has_tests=meaningful,
+            churn=churn,
+            fan_in=fan_in,
             weights=weights,
         )
         gaps.append(
@@ -350,7 +401,7 @@ def _gaps_for_file(
                 missing_branches=tuple(unique_branches),
                 complexity=bucket.span.complexity,
                 changed_uncovered=changed_uncovered,
-                has_tests=bool(existing),
+                has_tests=bool(existing) or bool(ran),
                 existing_tests=existing,
                 suggested_test=suggested,
                 score=value,
@@ -359,6 +410,9 @@ def _gaps_for_file(
                 weak_tests=weak_paths,
                 weak_reasons=weak_reasons,
                 test_kind=kind,
+                executed_by=ran,
+                churn=churn,
+                fan_in=fan_in,
             )
         )
     return gaps
@@ -369,7 +423,11 @@ def _test_kind(
     suggested: Path,
     existing: tuple[Path, ...],
     weak_paths: tuple[Path, ...],
+    *,
+    executed_by: tuple[str, ...] = (),
 ) -> TestKind:
+    if executed_by:
+        return TestKind.MEANINGFUL
     if existing:
         weak = set(weak_paths)
         if any(path not in weak for path in existing):

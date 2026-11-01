@@ -54,17 +54,19 @@ def write_coverage_json(
     missing_branches: list[list[int]] | None = None,
     line_percent: float = 70.0,
     branch_percent: float = 50.0,
+    contexts: dict[str, list[str]] | None = None,
 ) -> Path:
+    file_info = {
+        "executed_lines": executed_lines,
+        "missing_lines": missing_lines,
+        "excluded_lines": [],
+        "missing_branches": missing_branches or [],
+    }
+    if contexts:
+        file_info["contexts"] = contexts
     payload = {
         "meta": {"version": "7.16.0", "branch_coverage": True},
-        "files": {
-            filename: {
-                "executed_lines": executed_lines,
-                "missing_lines": missing_lines,
-                "excluded_lines": [],
-                "missing_branches": missing_branches or [],
-            }
-        },
+        "files": {filename: file_info},
         "totals": {
             "covered_lines": len(executed_lines),
             "num_statements": len(executed_lines) + len(missing_lines),

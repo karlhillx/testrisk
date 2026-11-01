@@ -5,6 +5,15 @@ All notable changes to this project are documented here. This project follows [S
 
 ## [Unreleased]
 
+### Added
+
+- Coverage test contexts (`pytest --cov-context=test`) populate `executed_by` so ranking no longer guesses which tests already run a function.
+- Pytest plugin: `pytest --cov --testrisk` prints the `--changed` report after the suite.
+- `--format sarif`, `--sarif PATH`, and Action `sarif` / `comment` inputs for code scanning and PR comments.
+- Versioned JSON contract (`schema: testrisk.gap/v2`). Public exports now include `TestKind`, `ScoreParts`, and `Weights`.
+- Churn (90-day git history) and fan-in (production importers) as `--explain` score signals.
+- `.testrisk-baseline` plus `--write-baseline` / `--no-baseline` so `--fail-on-risk` can ignore known gaps.
+
 ## [1.1.0] — 2026-09-12
 
 ### Added

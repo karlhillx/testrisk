@@ -89,6 +89,29 @@ def test_custom_weights_change_score():
     assert parts.missing_lines == 6.0
 
 
+def test_churn_and_fan_in_add_capped_score():
+    quiet, _, quiet_parts = score_gap(
+        missing_lines=1,
+        missing_branches=0,
+        complexity=1,
+        changed_uncovered=0,
+        has_tests=True,
+    )
+    hot, _, parts = score_gap(
+        missing_lines=1,
+        missing_branches=0,
+        complexity=1,
+        changed_uncovered=0,
+        has_tests=True,
+        churn=20,
+        fan_in=20,
+    )
+    assert parts.churn == 12 * 0.25
+    assert parts.fan_in == 10 * 0.4
+    assert hot - quiet == parts.churn + parts.fan_in
+    assert quiet_parts.churn == 0.0
+
+
 def test_classify_risk_changed_threshold():
     assert (
         classify_risk(

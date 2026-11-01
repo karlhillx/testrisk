@@ -12,6 +12,7 @@ import os
 import sys
 import traceback
 
+from .comment import render_markdown, upsert_pr_comment, write_step_summary
 from .config import load_settings
 from .discover import resolve_repo_path
 from .doctor import inspect_environment, print_doctor
@@ -19,6 +20,7 @@ from .engine import Options, analyze
 from .errors import GapError
 from .models import ChangedCoverage, Risk, parse_risk, risk_at_least
 from .report import render_json, render_prompt, render_text
+from .sarif import render_sarif, write_sarif
 from .ui import configure_ui, get_ui
 from .version import __version__
 
@@ -44,9 +46,12 @@ Examples:
   testrisk --file src/foo.py                # Restrict to one file
   testrisk --file 'src/foo/**'              # Glob include
   testrisk --exclude '**/migrations/**'     # Skip generated / noisy paths
-  testrisk --json                           # Machine-readable report
+  testrisk --json                           # Machine-readable report (schema testrisk.gap/v2)
+  testrisk --format sarif                   # GitHub code scanning
   testrisk --prompt                         # Agent task from the evidence
   testrisk --explain                        # Show score breakdown
+  testrisk --write-baseline                 # Snapshot current gaps as waived
+  pytest --cov --testrisk                   # Rank after the suite
   testrisk --weak-only                      # Gaps with missing or ceremonial tests
   testrisk --fail-under-changed 95          # CI gate on changed-line coverage
   testrisk --fail-on-risk HIGH              # CI gate on risk
@@ -128,12 +133,45 @@ Defaults can be set in pyproject.toml under [tool.testrisk].
     parser.add_argument(
         "--json",
         action="store_true",
-        help="Print the report as JSON",
+        help="Print the report as JSON (same as --format json)",
     )
     parser.add_argument(
         "--prompt",
         action="store_true",
         help="Print an evidence-based task for an AI coding agent",
+    )
+    parser.add_argument(
+        "--format",
+        choices=["text", "json", "prompt", "sarif"],
+        default=None,
+        help="Output format (default: text; --json / --prompt still work)",
+    )
+    parser.add_argument(
+        "--sarif",
+        default=None,
+        metavar="PATH",
+        help="Also write a SARIF 2.1.0 report to PATH",
+    )
+    parser.add_argument(
+        "--comment",
+        action="store_true",
+        help="Write a PR comment / GitHub step summary when GITHUB_* is set",
+    )
+    parser.add_argument(
+        "--baseline",
+        default=None,
+        metavar="PATH",
+        help="Waive qualnames in this file (default: .testrisk-baseline if present)",
+    )
+    parser.add_argument(
+        "--no-baseline",
+        action="store_true",
+        help="Ignore .testrisk-baseline and config baseline",
+    )
+    parser.add_argument(
+        "--write-baseline",
+        action="store_true",
+        help="Write the current matched gaps to the baseline file",
     )
     parser.add_argument(
         "--explain",
@@ -190,8 +228,12 @@ Defaults can be set in pyproject.toml under [tool.testrisk].
     )
 
     args = parser.parse_args()
-    color = "never" if args.json or args.prompt else args.color
-    configure_ui(color=color, quiet=bool(args.quiet and not args.json and not args.prompt))
+    output = _output_format(args)
+    color = "never" if output in {"json", "prompt", "sarif"} else args.color
+    configure_ui(
+        color=color,
+        quiet=bool(args.quiet and output == "text"),
+    )
     ui = get_ui()
 
     if args.top is not None and args.top < 0:
@@ -233,6 +275,12 @@ Defaults can be set in pyproject.toml under [tool.testrisk].
     weak_only = settings.weak_only if args.weak_only is None else args.weak_only
     fail_on_weak = settings.fail_on_weak if args.fail_on_weak is None else args.fail_on_weak
     default_omit = settings.default_omit if args.default_omit is None else args.default_omit
+    if args.no_baseline:
+        baseline: str | None = ""
+    elif args.baseline is not None:
+        baseline = args.baseline
+    else:
+        baseline = settings.baseline
     base = args.base if args.base is not None else settings.base
     files = tuple(args.files) if args.files else settings.include
     omit = tuple(dict.fromkeys([*settings.omit, *(args.exclude or ())]))
@@ -251,39 +299,61 @@ Defaults can be set in pyproject.toml under [tool.testrisk].
                 weights=settings.weights,
                 weak_only=weak_only,
                 default_omit=default_omit,
+                baseline=baseline,
+                write_baseline=args.write_baseline,
                 apply_config=False,
             )
         )
     except GapError as exc:
-        if args.json:
+        if output == "json":
             print(json.dumps({"error": str(exc).split("\n", 1)[0]}))
             return 1
         ui.error(str(exc))
         return 1
 
-    if args.json:
-        render_json(report, prompt=args.prompt)
-    elif args.prompt:
-        render_prompt(report)
-    elif args.quiet:
+    if args.quiet and output == "text":
         if report.suggested_target is not None:
             print(report.suggested_target.as_posix())
         elif report.gaps:
             print(report.gaps[0].suggested_test.as_posix())
+    elif output == "json":
+        render_json(report, prompt=args.prompt)
+    elif output == "prompt":
+        render_prompt(report)
+    elif output == "sarif":
+        render_sarif(report)
     else:
         render_text(report, explain=explain)
 
+    if args.sarif:
+        write_sarif(report, args.sarif)
+    if args.comment:
+        markdown = render_markdown(report)
+        write_step_summary(markdown)
+        upsert_pr_comment(markdown)
+
+    silent = output in {"json", "sarif"}
     if fail_on_risk is not None:
-        code = _check_risk_floor(report.worst_risk, fail_on_risk, report.matched, args.json)
+        code = _check_risk_floor(report.worst_risk, fail_on_risk, report.matched, silent)
         if code != 0:
             return code
     if fail_on_weak:
-        code = _check_weak_floor(report.weak_matched, args.json)
+        code = _check_weak_floor(report.weak_matched, silent)
         if code != 0:
             return code
     if fail_under is not None:
-        return _check_changed_floor(report.changed, fail_under, args.json)
+        return _check_changed_floor(report.changed, fail_under, silent)
     return 0
+
+
+def _output_format(args: argparse.Namespace) -> str:
+    if args.format:
+        return args.format
+    if args.json:
+        return "json"
+    if args.prompt:
+        return "prompt"
+    return "text"
 
 
 def _check_risk_floor(

@@ -27,6 +27,12 @@ inputs:
   extra-args:
     description: Extra arguments passed to testrisk
     default: ""
+  comment:
+    description: Post or update a PR comment and write GITHUB_STEP_SUMMARY
+    default: "false"
+  sarif:
+    description: Write testrisk.sarif for GitHub code scanning
+    default: "false"
   version:
     description: testrisk version to install with uvx (empty means latest)
     default: ""
@@ -42,6 +48,7 @@ runs:
       working-directory: ${{ github.workspace }}
       env:
         GITHUB_BASE_REF: ${{ github.base_ref }}
+        GITHUB_TOKEN: ${{ github.token }}
       run: |
         set -euo pipefail
         pkg="testrisk"
@@ -66,6 +73,12 @@ runs:
         fi
         if [ -n "${{ inputs.base }}" ]; then
           args+=(--base "${{ inputs.base }}")
+        fi
+        if [ "${{ inputs.comment }}" = "true" ]; then
+          args+=(--comment)
+        fi
+        if [ "${{ inputs.sarif }}" = "true" ]; then
+          args+=(--sarif testrisk.sarif)
         fi
         # shellcheck disable=SC2086
         uvx "$pkg" "${args[@]}" ${{ inputs.extra-args }}

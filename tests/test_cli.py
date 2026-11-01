@@ -217,6 +217,7 @@ def test_cli_json_includes_score_parts(tmp_path, monkeypatch, capsys):
     assert data["totals"]["shown"] == len(data["gaps"])
     assert "stale_coverage" in data
     assert data["changed_only"] is False
+    assert data["schema"] == "testrisk.gap/v2"
 
 
 def test_cli_prompt_includes_source(tmp_path, monkeypatch, capsys):
@@ -299,6 +300,33 @@ def test_cli_doctor_json(tmp_path, monkeypatch, capsys):
     assert data["config_file"] is None
     assert data["next"] == "testrisk --changed"
     assert "stale_coverage" in data
+
+
+def test_cli_sarif(tmp_path, monkeypatch, capsys):
+    write_sample_project(tmp_path)
+    write_coverage_json(
+        tmp_path,
+        missing_lines=[15, 16],
+        executed_lines=list(range(1, 8)),
+    )
+    code = _run(monkeypatch, ["--repo", str(tmp_path), "--format", "sarif"])
+    data = json.loads(capsys.readouterr().out)
+    assert code == 0
+    assert data["version"] == "2.1.0"
+    assert data["runs"][0]["tool"]["driver"]["name"] == "testrisk"
+
+
+def test_cli_write_baseline(tmp_path, monkeypatch, capsys):
+    write_sample_project(tmp_path)
+    write_coverage_json(
+        tmp_path,
+        missing_lines=[15, 16],
+        executed_lines=list(range(1, 8)),
+    )
+    code = _run(monkeypatch, ["--repo", str(tmp_path), "--write-baseline", "--quiet"])
+    assert code == 0
+    capsys.readouterr()
+    assert (tmp_path / ".testrisk-baseline").is_file()
 
 
 def test_package_main_help(monkeypatch, capsys):

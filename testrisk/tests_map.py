@@ -173,6 +173,15 @@ def _ambiguous_name(short: str) -> bool:
 
 def iter_test_files(root: Path) -> tuple[Path, ...]:
     """Repo-relative test modules, skipping virtualenvs and caches."""
+    return tuple(path for path in _iter_python_files(root) if is_test_path(path))
+
+
+def iter_source_files(root: Path) -> tuple[Path, ...]:
+    """Repo-relative production modules, skipping virtualenvs and caches."""
+    return tuple(path for path in _iter_python_files(root) if not is_test_path(path))
+
+
+def _iter_python_files(root: Path) -> tuple[Path, ...]:
     found: list[Path] = []
     for dirpath, dirnames, filenames in os.walk(root, followlinks=False):
         dirnames[:] = [name for name in dirnames if not _skip_dir(name)]
@@ -180,9 +189,7 @@ def iter_test_files(root: Path) -> tuple[Path, ...]:
         for name in filenames:
             if not name.endswith(".py"):
                 continue
-            rel = (current / name).relative_to(root)
-            if is_test_path(rel):
-                found.append(rel)
+            found.append((current / name).relative_to(root))
     return tuple(sorted(found, key=lambda item: item.as_posix()))
 
 

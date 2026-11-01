@@ -14,7 +14,8 @@ weights git-changed code and missing tests, and prints a prioritized list::
 from .discover import find_repo_root
 from .engine import Options, analyze
 from .errors import GapError
-from .models import Gap, GapReport, Risk
+from .models import Gap, GapReport, Risk, ScoreParts, TestKind
+from .rank import Weights
 from .version import __version__
 
 __author__ = "Karl Hill"
@@ -26,6 +27,9 @@ __all__ = [
     "GapReport",
     "Options",
     "Risk",
+    "ScoreParts",
+    "TestKind",
+    "Weights",
     "__version__",
     "analyze",
     "find_repo_root",

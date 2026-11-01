@@ -6,6 +6,7 @@ import json
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
+from .contexts import parse_contexts
 from .discover import relativize
 from .errors import GapError
 from .models import BranchGap, CoverageSnapshot, FileCoverage
@@ -56,6 +57,7 @@ def _with_relative_paths(file_cov: FileCoverage, root: Path) -> FileCoverage:
         missing_lines=file_cov.missing_lines,
         excluded_lines=file_cov.excluded_lines,
         missing_branches=file_cov.missing_branches,
+        contexts=file_cov.contexts,
     )
 
 
@@ -120,6 +122,7 @@ def _file_from_json(path: Path, info: dict) -> FileCoverage:
         missing_lines=missing,
         excluded_lines=excluded,
         missing_branches=tuple(branches),
+        contexts=parse_contexts(info.get("contexts")),
     )
 
 
@@ -259,6 +262,7 @@ def _load_coverage_db(source: Path) -> CoverageSnapshot:
                 missing_lines=missing_set,
                 excluded_lines=frozenset(int(n) for n in excluded),
                 missing_branches=tuple(branch_gaps),
+                contexts=_db_contexts(data, filename),
             )
         )
 
@@ -274,6 +278,29 @@ def _load_coverage_db(source: Path) -> CoverageSnapshot:
         covered_branches=covered_branches if has_arcs else None,
         branches=branches if has_arcs else None,
     )
+
+
+def _db_contexts(data: object, filename: str) -> dict[int, tuple[str, ...]]:
+    reader = getattr(data, "contexts_by_lineno", None)
+    if not callable(reader):
+        return {}
+    try:
+        raw = reader(filename) or {}
+    except Exception:
+        return {}
+    if not isinstance(raw, dict):
+        return {}
+    mapped: dict[int, tuple[str, ...]] = {}
+    for line, values in raw.items():
+        try:
+            number = int(line)
+        except (TypeError, ValueError):
+            continue
+        items = values if isinstance(values, (list, tuple, set)) else ()
+        names = parse_contexts({number: list(items)}).get(number, ())
+        if names:
+            mapped[number] = names
+    return mapped
 
 
 def _percent(raw: object, covered: int, total: int) -> float:

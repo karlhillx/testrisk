@@ -32,6 +32,10 @@ def render_text(report: GapReport, *, explain: bool = False) -> None:
         ui.kv("Changed", _changed_summary(report), persist=True)
     if report.stale_coverage:
         ui.kv("Stale", f"coverage older than changed files — {GENERATE_COVERAGE}", persist=True)
+    if report.has_contexts:
+        ui.kv("Contexts", "coverage test contexts (pytest --cov-context=test)", persist=True)
+    if report.waived:
+        ui.kv("Waived", f"{len(report.waived)} baseline gap(s) omitted from gates", persist=True)
     ui.blank(persist=True)
 
     if report.gaps:
@@ -65,6 +69,8 @@ def _render_gap(gap: Gap, index: int, *, explain: bool) -> None:
     if gap.changed_uncovered:
         ui.row("changed", format_line_ranges(gap.changed_uncovered), persist=True)
     ui.row("tests", _tests_label(gap), persist=True)
+    if gap.executed_by:
+        ui.row("ran", ", ".join(gap.executed_by[:3]), persist=True)
     if gap.weak_reasons:
         ui.row("weak", _weak_label(gap), persist=True)
     if explain:
@@ -99,6 +105,10 @@ def _why_label(parts: ScoreParts) -> str:
         bits.append(f"changed {parts.changed_uncovered:.1f}")
     if parts.no_tests:
         bits.append(f"no tests {parts.no_tests:.1f}")
+    if parts.churn:
+        bits.append(f"churn {parts.churn:.1f}")
+    if parts.fan_in:
+        bits.append(f"fan-in {parts.fan_in:.1f}")
     return "  ·  ".join(bits)
 
 
@@ -218,6 +228,8 @@ def _prompt_block(report: GapReport, gap: Gap) -> str:
                 f"Changed uncovered:\n{format_line_ranges(gap.changed_uncovered)}",
             ]
         )
+    if gap.executed_by:
+        lines.extend(["", "Tests that already execute this function:", *gap.executed_by])
     lines.extend(
         [
             "",

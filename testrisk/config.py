@@ -30,6 +30,7 @@ class Settings:
     weak_only: bool = False
     fail_on_weak: bool = False
     default_omit: bool = True
+    baseline: str | None = None
     weights: Weights = DEFAULT_WEIGHTS
 
 
@@ -101,6 +102,8 @@ def parse_settings(raw: dict[str, object]) -> Settings:
             settings,
             default_omit=_bool(_get(raw, "default_omit", "default-omit"), "default-omit"),
         )
+    if _has(raw, "baseline"):
+        settings = replace(settings, baseline=_opt_str(_get(raw, "baseline"), "baseline"))
     weights_raw = raw.get("weights")
     if weights_raw is not None:
         if not isinstance(weights_raw, dict):
@@ -130,6 +133,8 @@ def _parse_weights(raw: dict[str, object]) -> Weights:
         "complexity": ("complexity",),
         "changed_uncovered": ("changed_uncovered", "changed-uncovered"),
         "no_tests": ("no_tests", "no-tests"),
+        "churn": ("churn",),
+        "fan_in": ("fan_in", "fan-in"),
     }
     values: dict[str, float] = {}
     for field, aliases in mapping.items():

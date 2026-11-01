@@ -110,7 +110,11 @@ Generate coverage, then rank **this branch**:
 ```bash
 pytest --cov --cov-report=json
 testrisk --changed
+# or one command after the suite:
+pytest --cov --cov-report=json --testrisk
 ```
+
+Add `--cov-context=test` when you want testrisk to see which tests already executed a function (not just whether a test file mentions it).
 
 `--changed` is the everyday command. A full-repo `testrisk` still works when you want every gap; the report will nudge you back to `--changed` when the list is long.
 
@@ -124,7 +128,10 @@ testrisk --exclude '**/generated/**'
 testrisk --no-default-omit         # keep __init__.py and migrations/ in the ranking
 testrisk --min-risk HIGH           # hide LOW / MEDIUM
 testrisk --weak-only               # missing, indirect, or ceremonial related tests
-testrisk --json                    # machine-readable report
+testrisk --json                    # machine-readable report (schema testrisk.gap/v2)
+testrisk --format sarif            # GitHub code scanning
+testrisk --comment                 # PR comment + GITHUB_STEP_SUMMARY when in Actions
+testrisk --write-baseline          # snapshot current gaps as waived
 testrisk --prompt                  # evidence-based agent task (includes source)
 testrisk --explain                 # show how each score was assembled
 testrisk --fail-under-changed 95   # exit 1 if changed-line coverage is low
@@ -147,6 +154,7 @@ omit = ["**/generated/**"]
 include = ["src/**"]
 default-omit = true
 explain = false
+baseline = ".testrisk-baseline"
 
 [tool.testrisk.weights]
 missing-lines = 1.0
@@ -154,6 +162,8 @@ missing-branches = 2.0
 complexity = 0.75
 changed-uncovered = 3.0
 no-tests = 4.0
+churn = 0.25
+fan-in = 0.4
 ```
 
 CLI flags override the table. `--exclude` merges with `omit`. `--changed` / `--no-changed` override `changed`. `--no-default-omit` turns off the built-in skip of `__init__.py` and `migrations/`.
@@ -176,6 +186,13 @@ Use the composite action after you generate coverage. Fetch the base branch so `
     fail-on-risk: HIGH
     fail-on-weak: true
     fail-under-changed: "95"
+    comment: true
+    sarif: true
+
+# then, optionally:
+# - uses: github/codeql-action/upload-sarif@v3
+#   with:
+#     sarif_file: testrisk.sarif
 ```
 
 On pull requests, testrisk treats `GITHUB_BASE_REF` (then `origin/<ref>`) as the default `--base`. Pin a release with `version: 1.1.0` if you do not want `uvx` to pull latest.
@@ -218,10 +235,14 @@ Each function or method with uncovered statements or branches gets a score:
 | Complexity above 1 | × 0.75 |
 | Changed uncovered lines | × 3 |
 | No meaningful related tests (missing or ceremonial) | + 4 |
+| Recent file churn (capped) | × 0.25 |
+| Production fan-in (capped) | × 0.4 |
 
 Risk is `HIGH` / `MEDIUM` / `LOW` from that score plus a few hard rules (for example: five or more changed uncovered lines, or complexity ≥ 10 with two uncovered branches).
 
-Related tests are existing `test_*.py` / `*_test.py` files that mention the function. Short or generic names (`start`, `run`, `get`) also need the module stem or class name in the same file. A conventional `tests/test_<stem>.py` is not treated as coverage just because it exists. Each gap is labeled **none** (no test file yet), **indirect** (the conventional file exists but does not mention the function), **weak** (mentioned, but the checks cannot fail), or **meaningful**.
+Related tests are existing `test_*.py` / `*_test.py` files that mention the function. Short or generic names (`start`, `run`, `get`) also need the module stem or class name in the same file. A conventional `tests/test_<stem>.py` is not treated as coverage just because it exists. Each gap is labeled **none** (no test file yet), **indirect** (the conventional file exists but does not mention the function), **weak** (mentioned, but the checks cannot fail), or **meaningful**. When the coverage artifact includes test contexts, `executed_by` lists the tests that already ran other lines of the function — those gaps are meaningful even if the uncovered lines remain.
+
+`.testrisk-baseline` (JSON or one qualname per line) waives known gaps from `--fail-on-risk` / `--fail-on-weak`. `--write-baseline` snapshots the current matched set.
 
 Related tests that cannot fail — no assertions, only `assert True` / `assert x is not None`, or an import with no call — are marked **Weak**. They still appear as related files, but they do not count as meaningful checks (same +4 as none or indirect). This is a static filter, not mutation testing. testrisk does not run your suite.
 
@@ -258,7 +279,7 @@ for gap in report.gaps:
     print(gap.qualname, gap.risk, gap.score)
 ```
 
-`analyze(...)` returns a `GapReport`. Optional kwargs: `coverage`, `changed_only`, `base`, `files`, `omit`, `top`, `min_risk`, `weights`, `weak_only`, `default_omit`. You can also pass an `Options` instance. `omit` / include globs and other defaults are read from `[tool.testrisk]` unless you pass `Options(apply_config=False)`. Only names in `testrisk.__all__` are public; import the CLI via `python -m testrisk` or the `testrisk` console script.
+`analyze(...)` returns a `GapReport`. JSON reports include `"schema": "testrisk.gap/v2"`. Optional kwargs: `coverage`, `changed_only`, `base`, `files`, `omit`, `top`, `min_risk`, `weights`, `weak_only`, `default_omit`, `baseline`, `write_baseline`. You can also pass an `Options` instance. `omit` / include globs and other defaults are read from `[tool.testrisk]` unless you pass `Options(apply_config=False)`. Only names in `testrisk.__all__` are public; import the CLI via `python -m testrisk` or the `testrisk` console script.
 
 ## Requirements
 
@@ -285,6 +306,8 @@ uv run ty check
 | `FORCE_COLOR` | Enable color when `--color auto` even if stdout is not a TTY |
 | `TESTRISK_DEBUG` | Print a traceback on unexpected errors (same as `--verbose` for crashes) |
 | `GITHUB_BASE_REF` | Default `--base` on GitHub Actions pull requests (`origin/<ref>`, then `<ref>`) |
+| `GITHUB_TOKEN` / `GH_TOKEN` | Used by `--comment` to upsert the PR comment |
+| `GITHUB_STEP_SUMMARY` | `--comment` appends the same markdown to the job summary |
 
 testrisk **does not run your test suite**. It only reads coverage artifacts, source files, and git diffs.
 
@@ -296,6 +319,8 @@ Run tests with coverage and write a report in the repo root:
 
 ```bash
 pytest --cov --cov-report=json
+# optional: which tests executed each line
+pytest --cov --cov-context=test --cov-report=json
 # or
 coverage run -m pytest && coverage json
 ```

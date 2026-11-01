@@ -6,6 +6,8 @@ from dataclasses import dataclass, field
 from enum import StrEnum
 from pathlib import Path
 
+SCHEMA = "testrisk.gap/v2"
+
 
 class Risk(StrEnum):
     HIGH = "HIGH"
@@ -60,6 +62,8 @@ class ScoreParts:
     complexity: float = 0.0
     changed_uncovered: float = 0.0
     no_tests: float = 0.0
+    churn: float = 0.0
+    fan_in: float = 0.0
 
     @property
     def total(self) -> float:
@@ -69,6 +73,8 @@ class ScoreParts:
             + self.complexity
             + self.changed_uncovered
             + self.no_tests
+            + self.churn
+            + self.fan_in
         )
 
     def to_dict(self) -> dict[str, float]:
@@ -78,6 +84,8 @@ class ScoreParts:
             "complexity": round(self.complexity, 3),
             "changed_uncovered": round(self.changed_uncovered, 3),
             "no_tests": round(self.no_tests, 3),
+            "churn": round(self.churn, 3),
+            "fan_in": round(self.fan_in, 3),
             "total": round(self.total, 3),
         }
 
@@ -106,10 +114,15 @@ class FileCoverage:
     missing_lines: frozenset[int]
     excluded_lines: frozenset[int]
     missing_branches: tuple[BranchGap, ...] = ()
+    contexts: dict[int, tuple[str, ...]] = field(default_factory=dict)
 
     @property
     def statements(self) -> frozenset[int]:
         return self.executed_lines | self.missing_lines
+
+    @property
+    def has_contexts(self) -> bool:
+        return any(self.contexts.values())
 
 
 @dataclass(frozen=True)
@@ -160,6 +173,9 @@ class Gap:
     weak_tests: tuple[Path, ...] = ()
     weak_reasons: tuple[str, ...] = ()
     test_kind: TestKind | None = None
+    executed_by: tuple[str, ...] = ()
+    churn: int = 0
+    fan_in: int = 0
 
     @property
     def qualname(self) -> str:
@@ -201,6 +217,9 @@ class Gap:
             "existing_tests": [path.as_posix() for path in self.existing_tests],
             "weak_tests": [path.as_posix() for path in self.weak_tests],
             "weak_reasons": list(self.weak_reasons),
+            "executed_by": list(self.executed_by),
+            "churn": self.churn,
+            "fan_in": self.fan_in,
             "suggested_test": self.suggested_test.as_posix(),
             "score": round(self.score, 3),
             "score_parts": self.score_parts.to_dict(),
@@ -278,9 +297,12 @@ class GapReport:
     totals: Totals = field(default_factory=Totals)
     changed_only: bool = False
     stale_coverage: bool = False
+    has_contexts: bool = False
+    waived: tuple[str, ...] = ()
 
     def to_dict(self) -> dict[str, object]:
         payload = {
+            "schema": SCHEMA,
             "version": self.version,
             "root": str(self.root),
             "matched": self.matched,
@@ -314,6 +336,8 @@ class GapReport:
             ),
             "changed_only": self.changed_only,
             "stale_coverage": self.stale_coverage,
+            "has_contexts": self.has_contexts,
+            "waived": list(self.waived),
         }
         return payload
 
